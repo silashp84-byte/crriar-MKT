@@ -59,3 +59,40 @@ export async function generateMarketingCampaign(brief: MarketingBrief): Promise<
 
   return JSON.parse(response.text || "{}") as AdCampaign;
 }
+
+export async function generateAdImage(prompt: string, platform: string): Promise<string> {
+  const aspectRatioMap: Record<string, "1:1" | "3:4" | "4:3" | "9:16" | "16:9"> = {
+    "Instagram": "1:1",
+    "Facebook": "1:1",
+    "LinkedIn": "4:3",
+    "Twitter/X": "16:9",
+    "Google Ads": "16:9",
+    "Email Marketing": "3:4"
+  };
+
+  const aspectRatio = aspectRatioMap[platform] || "1:1";
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash-image',
+    contents: {
+      parts: [
+        {
+          text: `Professional advertisement visual for: ${prompt}. High quality, marketing grade, studio lighting, product focus.`,
+        },
+      ],
+    },
+    config: {
+      imageConfig: {
+        aspectRatio: aspectRatio,
+      },
+    },
+  });
+
+  for (const part of response.candidates?.[0]?.content?.parts || []) {
+    if (part.inlineData) {
+      return `data:image/png;base64,${part.inlineData.data}`;
+    }
+  }
+
+  throw new Error("No image data returned from Gemini");
+}

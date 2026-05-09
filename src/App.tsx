@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import confetti from "canvas-confetti";
-import { generateMarketingCampaign, MarketingBrief, AdCampaign } from "./services/geminiService";
+import { generateMarketingCampaign, generateAdImage, MarketingBrief, AdCampaign } from "./services/geminiService";
 
 export default function App() {
   const [brief, setBrief] = useState<MarketingBrief>({
@@ -36,7 +36,9 @@ export default function App() {
   });
 
   const [campaign, setCampaign] = useState<AdCampaign | null>(null);
+  const [adImage, setAdImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
@@ -45,19 +47,35 @@ export default function App() {
     if (!brief.productName || !brief.description) return;
 
     setIsLoading(true);
+    setAdImage(null);
     setError(null);
     try {
       const result = await generateMarketingCampaign(brief);
       setCampaign(result);
+      
       confetti({
         particleCount: 100,
         spread: 70,
         origin: { y: 0.6 },
-        colors: ["#00FF00", "#FFFFFF", "#000000"]
+        colors: ["#C5A059", "#FFFFFF", "#000000"]
       });
+
       setTimeout(() => {
         resultsRef.current?.scrollIntoView({ behavior: "smooth" });
       }, 100);
+
+      // Start image generation separately after copy is ready
+      setIsGeneratingImage(true);
+      try {
+        const imageUrl = await generateAdImage(result.imagePrompt, brief.platform);
+        setAdImage(imageUrl);
+      } catch (imgErr) {
+        console.error("Image gen failed:", imgErr);
+        // We don't block the UI if only image fails, just show the prompt
+      } finally {
+        setIsGeneratingImage(false);
+      }
+
     } catch (err) {
       console.error(err);
       setError("Failed to generate campaign. Please check your AI Studio configuration.");
@@ -320,8 +338,24 @@ export default function App() {
                   </div>
                   <div className="flex flex-col md:flex-row gap-8 items-start">
                     <div className="w-full md:w-1/3 aspect-[3/4] bg-dark-bg border border-dark-border rounded-xl relative overflow-hidden shadow-inner flex items-center justify-center">
-                       <div className="absolute inset-0 bg-gradient-to-b from-dark-card via-transparent to-black opacity-60"></div>
-                       <Sparkles className="w-12 h-12 text-[#1F1F1F]" />
+                       {isGeneratingImage ? (
+                         <div className="flex flex-col items-center gap-2">
+                           <Loader2 className="w-8 h-8 animate-spin text-gold-premium" />
+                           <span className="text-[8px] uppercase tracking-widest font-bold text-[#52525B]">Developing...</span>
+                         </div>
+                       ) : adImage ? (
+                         <img 
+                          src={adImage} 
+                          alt="AI Concept" 
+                          className="absolute inset-0 w-full h-full object-cover"
+                          referrerPolicy="no-referrer"
+                         />
+                       ) : (
+                         <>
+                          <div className="absolute inset-0 bg-gradient-to-b from-dark-card via-transparent to-black opacity-60"></div>
+                          <Sparkles className="w-12 h-12 text-[#1F1F1F]" />
+                         </>
+                       )}
                     </div>
                     <div className="flex-1 space-y-6">
                       <div>
